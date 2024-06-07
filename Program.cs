@@ -1,9 +1,11 @@
-using FinalTerm.Services;
+﻿using FinalTerm.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+//lấy chuỗi kết nối từ tệp cấu hình
 var connectionString = builder.Configuration.GetConnectionString("Default") ?? "";
+// đăng ký một dịch vụ với chuỗi kết nối đã lấy từ tệp cấu hình
 builder.Services.AddScoped<IDatabaseService>(x => new DatabaseService(connectionString));
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

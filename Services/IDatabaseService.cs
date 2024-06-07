@@ -7,14 +7,20 @@ using FinalTerm.Models.RequestModel;
 public interface IDatabaseService
 {
     List<NganhHocDto> GetNganh(int manganh);
-    int AddSinhVien(SinhVienRequestModel requestModel);
+    List<TongNganhHocTinChiDto> GetTongNganhHocTinChi();
 
     List<SinhVienDto> GetSinhVien();
+    int AddSinhVien(SinhVienRequestModel requestModel);
+
     List<SinhVienMonHocDto> GetSinhVienMonHoc();
 
     MonHocDto? GetMonHocById(int mamon);
     SinhVienDto? GetSinhVienById(int masv);
-    int UpdateSinhVienBoMon(int mamon, int masv, SinhVienMonHocRequestModel requestModel);
+    int UpdateSinhVienMonHoc(int mamon, int masv, SinhVienMonHocRequestModel requestModel);
+
+    int DeleteSinhVien(int masv);
+
+    
 }
 
 public class DatabaseService : IDatabaseService
@@ -37,6 +43,32 @@ public class DatabaseService : IDatabaseService
         return connection.Query<NganhHocDto>(sql, new { manganh }).ToList();
     }
 
+    public List<TongNganhHocTinChiDto> GetTongNganhHocTinChi()
+    {
+        string sql = """
+            select nh.MaNganh,nh.TenNganh,
+            COUNT(mh.MaMon) AS TotalMonHoc,SUM(mh.SoTinChi) AS TotalSoTinChi
+            from NganhHoc as nh
+            join MonHoc as mh on nh.MaNganh = mh.MaNganh
+            group by nh.MaNganh,nh.TenNganh
+            """;
+        using var connection = GetConnection();
+
+        return connection.Query<TongNganhHocTinChiDto>(sql).ToList();
+    }
+
+    public List<SinhVienDto> GetSinhVien()
+    {
+        string sql = """
+            SELECT MaSinhVien, HoTen, NamNhapHoc
+            FROM SinhVien
+            """;
+
+        using var connection = GetConnection();
+
+        return connection.Query<SinhVienDto>(sql).ToList();
+    }
+
     public int AddSinhVien(SinhVienRequestModel requestModel)
     {
         string sql = """
@@ -55,18 +87,6 @@ public class DatabaseService : IDatabaseService
         });
 
         return result;
-    }
-
-    public List<SinhVienDto> GetSinhVien()
-    {
-        string sql = """
-            SELECT MaSinhVien, HoTen, NamNhapHoc
-            FROM SinhVien
-            """;
-
-        using var connection = GetConnection();
-
-        return connection.Query<SinhVienDto>(sql).ToList();
     }
 
     public List<SinhVienMonHocDto> GetSinhVienMonHoc()
@@ -105,7 +125,7 @@ public class DatabaseService : IDatabaseService
         return connection.Query<SinhVienDto>(sql, new { masv }).FirstOrDefault();
     }
 
-    public int UpdateSinhVienBoMon(int mamon, int masv, SinhVienMonHocRequestModel requestModel)
+    public int UpdateSinhVienMonHoc(int mamon, int masv, SinhVienMonHocRequestModel requestModel)
     {
         string sql = """
             UPDATE SinhVien_MonHoc
@@ -129,7 +149,45 @@ public class DatabaseService : IDatabaseService
         return result;
     }
 
+    public int DeleteSinhVien(int masv)
+    {
+        using var connection = GetConnection();
 
+        try
+        {
+            // Kiểm tra xem có bản ghi liên quan trong SinhVien_MonHoc không
+            string svmh = """
+            SELECT COUNT(*) 
+            FROM SinhVien_MonHoc
+            WHERE MaSinhVien = @maSv
+            """;
+            var count = connection.ExecuteScalar<int>(svmh, new { maSv = masv });
+
+            if (count > 0)
+            {
+                // Xóa trước SinhVien_MonHoc
+                string deleteSinhVienMonHoc = """
+                DELETE FROM SinhVien_MonHoc
+                WHERE MaSinhVien = @maSv
+                """;
+                connection.Execute(deleteSinhVienMonHoc, new { maSv = masv });
+            }
+
+            // Sau đó xóa  SinhVien
+            string deleteSinhVien = """
+            DELETE FROM SinhVien
+            WHERE MaSinhVien = @maSv
+            """;
+            var result = connection.Execute(deleteSinhVien, new { maSv = masv });
+
+            return result;
+        }
+        catch
+        {
+            // Nếu có lỗi, xử lý ngoại lệ ở đây
+            throw;
+        }
+    }
 
     private SqlConnection GetConnection()
     {
